@@ -1,6 +1,7 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 from dotenv import load_dotenv
 import uuid
 import asyncio
@@ -91,15 +92,86 @@ async def get_analyses():
 
 
 @app.get("/api/generate-deck/{job_id}")
-async def generate_deck(job_id: str):
-    """Generate an HTML pitch deck for a completed analysis."""
+async def generate_deck(
+    job_id: str,
+    audience: str = Query(default="general", regex="^(general|cto|engineering_manager|ic)$"),
+):
+    """Generate an HTML pitch deck for a completed analysis.
+    
+    audience: general | cto | engineering_manager | ic
+    """
     result = await get_analysis(job_id)
     if not result:
         raise HTTPException(status_code=404, detail="Analysis not found")
     if result.status != AnalysisStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="Analysis not yet completed")
-    deck_html = generate_deck_html(result)
+    deck_html = generate_deck_html(result, audience=audience)
     return HTMLResponse(content=deck_html, media_type="text/html")
+
+
+class CompareRequest(BaseModel):
+    job_id_1: str
+    job_id_2: str
+
+
+@app.post("/api/compare")
+async def compare_analyses(req: CompareRequest):
+    """Compare two completed analyses side-by-side."""
+    r1 = await get_analysis(req.job_id_1)
+    r2 = await get_analysis(req.job_id_2)
+    if not r1 or not r2:
+        raise HTTPException(status_code=404, detail="One or both analyses not found")
+    if r1.status != AnalysisStatus.COMPLETED or r2.status != AnalysisStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Both analyses must be completed")
+
+    def _metrics(r):
+        total_repos = len(r.repos)
+        total_issues = sum(repo.open_issues for repo in r.repos)
+        total_stars = sum(repo.stars for repo in r.repos)
+        languages = set()
+        for ra in r.repo_analyses:
+            for lang in ra.languages:
+                languages.add(lang)
+        total_opportunities = sum(len(ra.devin_opportunities) for ra in r.repo_analyses)
+        avg_test_ratio = 0.0
+        if r.repo_analyses:
+            avg_test_ratio = round(sum(ra.test_file_ratio for ra in r.repo_analyses) / len(r.repo_analyses) * 100, 1)
+        avg_merge_hours = 0.0
+        merge_counts = [ra.trend_data.get("avg_pr_merge_hours", 0) for ra in r.repo_analyses if ra.trend_data] if r.repo_analyses else []
+        if merge_counts:
+            avg_merge_hours = round(sum(merge_counts) / len(merge_counts), 1)
+        security_findings = sum(len(ra.security_findings) for ra in r.repo_analyses) if r.repo_analyses else 0
+        savings = r.business_case.roi_estimate.get("annual_savings", 0) if r.business_case else 0
+        hours = r.business_case.roi_estimate.get("hours_recaptured", 0) if r.business_case else 0
+        return {
+            "repos": total_repos,
+            "issues": total_issues,
+            "stars": total_stars,
+            "languages": sorted(languages)[:8],
+            "opportunities": total_opportunities,
+            "test_coverage_pct": avg_test_ratio,
+            "avg_pr_merge_hours": avg_merge_hours,
+            "security_findings": security_findings,
+            "annual_savings": savings,
+            "hours_recaptured": hours,
+        }
+
+    return {
+        "company_1": {
+            "job_id": r1.job_id,
+            "company_name": r1.company_name,
+            "github_org": r1.github_org,
+            "research_depth": r1.research_depth,
+            "metrics": _metrics(r1),
+        },
+        "company_2": {
+            "job_id": r2.job_id,
+            "company_name": r2.company_name,
+            "github_org": r2.github_org,
+            "research_depth": r2.research_depth,
+            "metrics": _metrics(r2),
+        },
+    }
 
 
 @app.post("/api/deep-research/{job_id}")

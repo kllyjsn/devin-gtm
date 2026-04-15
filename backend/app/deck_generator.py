@@ -9,8 +9,15 @@ def _e(text: str) -> str:
     return html.escape(str(text))
 
 
-def generate_deck_html(result: AnalysisResult) -> str:
-    """Generate a complete HTML pitch deck from analysis results."""
+def generate_deck_html(result: AnalysisResult, audience: str = "general") -> str:
+    """Generate a complete HTML pitch deck from analysis results.
+    
+    audience: 'general' | 'cto' | 'engineering_manager' | 'ic'
+    - cto: Emphasizes ROI, cost savings, strategic alignment, build vs buy
+    - engineering_manager: Emphasizes velocity, coverage, backlog, team capacity
+    - ic: Emphasizes DX, tooling, workflow, code quality
+    - general: Balanced across all three
+    """
     company = _e(result.company_name)
     org = _e(result.github_org)
     bc = result.business_case
@@ -52,58 +59,103 @@ def generate_deck_html(result: AnalysisResult) -> str:
 
     slides_html = []
 
-    # --- SLIDE 1: TITLE ---
-    slides_html.append(_slide_title(company, org, 1))
+    # Audience-specific subtitle and title
+    audience_config = {
+        "cto": {
+            "subtitle": f"Executive ROI analysis and strategic alignment assessment for {company}",
+            "title_suffix": "Executive Briefing",
+        },
+        "engineering_manager": {
+            "subtitle": f"Engineering velocity, coverage gaps, and team capacity analysis for {company}",
+            "title_suffix": "Engineering Leadership Briefing",
+        },
+        "ic": {
+            "subtitle": f"Developer experience, tooling, and workflow automation analysis for {company}",
+            "title_suffix": "Developer Briefing",
+        },
+        "general": {
+            "subtitle": f"A data-driven assessment of {company}'s engineering landscape and Devin's potential impact",
+            "title_suffix": "Engineering Efficiency Partnership",
+        },
+    }
+    config = audience_config.get(audience, audience_config["general"])
+    n = 0
 
-    # --- SLIDE 2: STATE OF SOFTWARE ENGINEERING ---
-    slides_html.append(_slide_macro_zoom_out(company, 2))
+    # --- SLIDE 1: TITLE (all audiences) ---
+    n += 1
+    slides_html.append(_slide_title(company, org, n, subtitle=config["subtitle"], title_suffix=config["title_suffix"]))
 
-    # --- SLIDE 3: AGENDA ---
-    slides_html.append(_slide_agenda(company, 3))
+    # --- STATE OF SOFTWARE ENGINEERING (CTO + general) ---
+    if audience in ("general", "cto"):
+        n += 1
+        slides_html.append(_slide_macro_zoom_out(company, n))
 
-    # --- SLIDE 4: STATE OF THE UNION ---
+    # --- AGENDA (general only) ---
+    if audience == "general":
+        n += 1
+        slides_html.append(_slide_agenda(company, n))
+
+    # --- STATE OF THE UNION (all audiences) ---
+    n += 1
     slides_html.append(_slide_state_of_union(
         company, org, total_repos, analyzed_repos, total_issues,
-        total_stars, top_langs, cr, 4
+        total_stars, top_langs, cr, n
     ))
 
-    # --- SLIDE 5: THREE-TIER IMPACT ---
-    slides_html.append(_slide_three_tier_impact(company, bc, 5))
+    # --- THREE-TIER IMPACT (all audiences, but highlight relevant tier) ---
+    n += 1
+    slides_html.append(_slide_three_tier_impact(company, bc, n, highlight=audience))
 
-    # --- SLIDE 6: DISCOVERY QUESTIONS ---
-    slides_html.append(_slide_discovery(company, gtm, cr, 6))
+    # --- DISCOVERY QUESTIONS (CTO + general) ---
+    if audience in ("general", "cto"):
+        n += 1
+        slides_html.append(_slide_discovery(company, gtm, cr, n))
 
-    # --- SLIDE 7: TOP OPPORTUNITIES ---
-    slides_html.append(_slide_opportunities(company, analyses, 7))
+    # --- TOP OPPORTUNITIES (all audiences) ---
+    n += 1
+    slides_html.append(_slide_opportunities(company, analyses, n))
 
-    # --- SLIDE 8: HOW DEVIN WORKS ---
-    slides_html.append(_slide_how_devin_works(company, 8))
+    # --- HOW DEVIN WORKS (EM + IC + general) ---
+    if audience in ("general", "engineering_manager", "ic"):
+        n += 1
+        slides_html.append(_slide_how_devin_works(company, n))
 
-    # --- SLIDE 9: BUILD VS BUY ---
-    slides_html.append(_slide_build_vs_buy(company, bc, 9))
+    # --- BUILD VS BUY (CTO + general) ---
+    if audience in ("general", "cto"):
+        n += 1
+        slides_html.append(_slide_build_vs_buy(company, bc, n))
 
-    # --- SLIDE 10: COST ANALYSIS ---
-    slides_html.append(_slide_cost_analysis(company, bc, 10))
+    # --- COST ANALYSIS (CTO + EM + general) ---
+    if audience in ("general", "cto", "engineering_manager"):
+        n += 1
+        slides_html.append(_slide_cost_analysis(company, bc, n))
 
-    # --- SLIDE 11: ANNUAL ROI ---
-    slides_html.append(_slide_annual_roi(
-        company, savings, hours_recaptured, addressable, roi_multiple, 11
-    ))
+    # --- ANNUAL ROI (CTO + general) ---
+    if audience in ("general", "cto"):
+        n += 1
+        slides_html.append(_slide_annual_roi(
+            company, savings, hours_recaptured, addressable, roi_multiple, n
+        ))
 
-    # --- SLIDE 12: SECURITY ---
-    slides_html.append(_slide_security(company, 12))
+    # --- SECURITY (all audiences) ---
+    n += 1
+    slides_html.append(_slide_security(company, n))
 
-    # --- SLIDE 13: COLLABORATIVE CLOSE ---
-    slides_html.append(_slide_close(company, 13))
+    # --- COLLABORATIVE CLOSE (all audiences) ---
+    n += 1
+    slides_html.append(_slide_close(company, n))
 
     all_slides = "\n\n".join(slides_html)
+
+    audience_label = {"cto": "CTO", "engineering_manager": "Engineering Manager", "ic": "Developer", "general": ""}.get(audience, "")
+    title_extra = f" &mdash; {audience_label} Edition" if audience_label else ""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1280, initial-scale=1.0">
-<title>Devin x {company} &mdash; Engineering Efficiency Partnership</title>
+<title>Devin x {company} &mdash; {config['title_suffix']}{title_extra}</title>
 {_css()}
 </head>
 <body>
@@ -117,7 +169,8 @@ def _footer(company: str, slide_num: int) -> str:
     return f'<div class="slide-bottom-bar"><span>Devin &times; {company}</span><span class="slide-num">{slide_num:02d}</span></div>'
 
 
-def _slide_title(company: str, org: str, n: int) -> str:
+def _slide_title(company: str, org: str, n: int, subtitle: str = "", title_suffix: str = "") -> str:
+    sub = subtitle or f"A data-driven assessment of {company}'s engineering landscape and Devin's potential impact"
     return f"""<!-- SLIDE {n}: TITLE -->
 <div class="slide slide-title">
   <div class="slide-content">
@@ -127,7 +180,7 @@ def _slide_title(company: str, org: str, n: int) -> str:
     <span class="logo-text logo-company">{company.lower()}</span>
   </div>
   <h1>Accelerating Engineering Quality<br>with Autonomous Engineering</h1>
-  <p class="subtitle">A data-driven assessment of {company}'s engineering landscape and Devin's potential impact</p>
+  <p class="subtitle">{_e(sub)}</p>
   <p class="meta">Prepared for {company} Engineering Leadership &bull; Confidential</p>
   </div>
   {_footer(company, n)}
@@ -286,7 +339,7 @@ def _slide_state_of_union(
 </div>"""
 
 
-def _slide_three_tier_impact(company: str, bc: Optional[BusinessCase], n: int) -> str:
+def _slide_three_tier_impact(company: str, bc: Optional[BusinessCase], n: int, highlight: str = "general") -> str:
     exec_metrics = ["Cost savings from automated maintenance", "Hours recaptured for strategic work", "Faster time-to-market on initiatives"]
     em_metrics = ["Clear issue backlog without adding headcount", "Improve test coverage across under-tested repos", "Free senior engineers for architecture work"]
     dev_metrics = ["Review-only workflow — Devin writes the code, you approve", "No more context-switching for routine fixes", "AI handles boilerplate: tests, docs, dependency updates"]
@@ -304,6 +357,16 @@ def _slide_three_tier_impact(company: str, bc: Optional[BusinessCase], n: int) -
         items = "".join(f'<li style="font-size: 13px; margin-bottom: 4px;">{_e(m)}</li>' for m in metrics)
         return f'<ul style="list-style: none; padding: 0; margin: 8px 0 0 0;">{items}</ul>'
 
+    # Highlight the relevant tier based on audience
+    def _card_style(tier: str) -> str:
+        if highlight == "general":
+            return 'class="card-dark" style="padding: 20px;"'
+        if (highlight == "cto" and tier == "exec") or \
+           (highlight == "engineering_manager" and tier == "em") or \
+           (highlight == "ic" and tier == "dev"):
+            return 'class="card-dark" style="padding: 20px; border: 2px solid var(--accent-cyan); box-shadow: 0 0 20px rgba(0,212,255,0.15);"'
+        return 'class="card-dark" style="padding: 20px; opacity: 0.6;"'
+
     return f"""<!-- SLIDE {n}: THREE-TIER IMPACT -->
 <div class="slide slide-dark">
   <div class="slide-content">
@@ -311,15 +374,15 @@ def _slide_three_tier_impact(company: str, bc: Optional[BusinessCase], n: int) -
   <h2>Three levels of impact for {company}</h2>
   <p style="max-width: 900px; margin-bottom: 16px;">We've mapped Devin's potential value across every level of your engineering organization.</p>
   <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
-    <div class="card-dark" style="padding: 20px;">
+    <div {_card_style("exec")}>
       <h3 style="color: var(--accent-cyan); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">&#127970; Business Impact</h3>
       {_metric_list(exec_metrics)}
     </div>
-    <div class="card-dark" style="padding: 20px;">
+    <div {_card_style("em")}>
       <h3 style="color: var(--accent-cyan); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">&#128200; Engineering Manager Impact</h3>
       {_metric_list(em_metrics)}
     </div>
-    <div class="card-dark" style="padding: 20px;">
+    <div {_card_style("dev")}>
       <h3 style="color: var(--accent-cyan); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">&#9000; Hands-on-Keyboard Impact</h3>
       {_metric_list(dev_metrics)}
     </div>

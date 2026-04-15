@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import './App.css'
 import {
   Search, Loader2, Building2, GitBranch, BarChart3, FileText,
@@ -6,7 +6,8 @@ import {
   BookOpen, Zap, Shield, Users, Clock, DollarSign, TrendingUp,
   Copy, Check, ArrowLeft, Presentation, Microscope, ShieldAlert,
   Activity, Target, Briefcase, MessageSquare, Megaphone,
-  AlertTriangle, Info, Tag
+  AlertTriangle, Info, Tag, Download, ChevronDown,
+  GitCompare, Link
 } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -137,7 +138,7 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 function App() {
-  const [view, setView] = useState<'home' | 'results'>('home')
+  const [view, setView] = useState<'home' | 'results' | 'compare'>('home')
   const [inputUrl, setInputUrl] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentJobId, setCurrentJobId] = useState<string | null>(null)
@@ -146,6 +147,21 @@ function App() {
   const [pastAnalyses, setPastAnalyses] = useState<PastAnalysis[]>([])
   const [activeTab, setActiveTab] = useState('overview')
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  // Comparison mode state
+  const [compareSelection, setCompareSelection] = useState<string[]>([])
+  const [compareData, setCompareData] = useState<Record<string, unknown> | null>(null)
+  const [compareLoading, setCompareLoading] = useState(false)
+
+  // URL hash routing for shareable links
+  useEffect(() => {
+    const hash = window.location.hash
+    const match = hash.match(/^#\/results\/(.+)$/)
+    if (match) {
+      const jobId = match[1]
+      loadResult(jobId)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Fetch past analyses on mount
   useEffect(() => {
@@ -206,6 +222,7 @@ function App() {
     setCurrentJobId(jobId)
     setView('results')
     setIsSubmitting(true)
+    window.location.hash = `#/results/${jobId}`
     try {
       const r = await fetch(`${API_URL}/api/results/${jobId}`)
       const data = await r.json()
@@ -218,11 +235,48 @@ function App() {
     }
   }
 
+  const toggleCompareSelection = (jobId: string) => {
+    setCompareSelection(prev => {
+      if (prev.includes(jobId)) return prev.filter(id => id !== jobId)
+      if (prev.length >= 2) return [prev[1], jobId]
+      return [...prev, jobId]
+    })
+  }
+
+  const startComparison = async () => {
+    if (compareSelection.length !== 2) return
+    setCompareLoading(true)
+    try {
+      const r = await fetch(`${API_URL}/api/compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id_1: compareSelection[0], job_id_2: compareSelection[1] }),
+      })
+      const data = await r.json()
+      setCompareData(data)
+      setView('compare')
+    } catch {
+      // ignore
+    } finally {
+      setCompareLoading(false)
+    }
+  }
+
   const copyToClipboard = useCallback((text: string, field: string) => {
     navigator.clipboard.writeText(text)
     setCopiedField(field)
     setTimeout(() => setCopiedField(null), 2000)
   }, [])
+
+  if (view === 'compare' && compareData) {
+    return (
+      <CompareView
+        data={compareData}
+        onBack={() => { setView('home'); setCompareData(null); setCompareSelection([]); }}
+        onViewAnalysis={(jobId: string) => loadResult(jobId)}
+      />
+    )
+  }
 
   if (view === 'results') {
     return (
@@ -234,7 +288,7 @@ function App() {
         setActiveTab={setActiveTab}
         copiedField={copiedField}
         copyToClipboard={copyToClipboard}
-        onBack={() => { setView('home'); setCurrentJobId(null); setResult(null); }}
+        onBack={() => { setView('home'); setCurrentJobId(null); setResult(null); window.location.hash = ''; }}
       />
     )
   }
@@ -292,27 +346,67 @@ function App() {
       {/* Past Analyses */}
       {pastAnalyses.length > 0 && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
-          <h2 className="text-zinc-400 text-sm font-medium uppercase tracking-wider mb-4">Recent Analyses</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-zinc-400 text-sm font-medium uppercase tracking-wider">Recent Analyses</h2>
+            {pastAnalyses.filter(a => a.status === 'completed').length >= 2 && (
+              <div className="flex items-center gap-3">
+                {compareSelection.length === 2 && (
+                  <button
+                    onClick={startComparison}
+                    disabled={compareLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-devin-purple to-devin-blue hover:from-devin-purple-light hover:to-devin-blue-light text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-devin-purple/20"
+                  >
+                    {compareLoading ? <Loader2 size={14} className="animate-spin" /> : <GitCompare size={14} />}
+                    Compare Selected
+                  </button>
+                )}
+                {compareSelection.length > 0 && (
+                  <button
+                    onClick={() => setCompareSelection([])}
+                    className="text-xs text-zinc-500 hover:text-zinc-300"
+                  >
+                    Clear
+                  </button>
+                )}
+                <span className="text-xs text-zinc-600">
+                  {compareSelection.length === 0 ? 'Select 2 to compare' : `${compareSelection.length}/2 selected`}
+                </span>
+              </div>
+            )}
+          </div>
           <div className="grid gap-3">
             {pastAnalyses.map((a) => (
-              <button
-                key={a.job_id}
-                onClick={() => loadResult(a.job_id)}
-                className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-zinc-600 transition-colors text-left w-full"
-              >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-zinc-800 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Building2 size={18} className="text-zinc-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate text-sm sm:text-base">{a.company_name || a.input_url}</div>
-                  <div className="text-xs sm:text-sm text-zinc-500">{a.repo_count} repos · {a.github_org}</div>
-                </div>
-                <div className="hidden sm:flex items-center gap-2 text-sm text-zinc-500">
-                  <span className={`inline-block w-2 h-2 rounded-full ${a.status === 'completed' ? 'bg-devin-green' : a.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500'}`} />
-                  {new Date(a.created_at).toLocaleDateString()}
-                </div>
-                <ChevronRight size={16} className="text-zinc-600 flex-shrink-0" />
-              </button>
+              <div key={a.job_id} className="flex items-center gap-2">
+                {a.status === 'completed' && pastAnalyses.filter(x => x.status === 'completed').length >= 2 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleCompareSelection(a.job_id) }}
+                    className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                      compareSelection.includes(a.job_id)
+                        ? 'bg-devin-purple border-devin-purple text-white'
+                        : 'border-zinc-600 hover:border-zinc-400'
+                    }`}
+                  >
+                    {compareSelection.includes(a.job_id) && <Check size={12} />}
+                  </button>
+                )}
+                <button
+                  onClick={() => loadResult(a.job_id)}
+                  className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-zinc-600 transition-colors text-left flex-1 min-w-0"
+                >
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-zinc-800 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Building2 size={18} className="text-zinc-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate text-sm sm:text-base">{a.company_name || a.input_url}</div>
+                    <div className="text-xs sm:text-sm text-zinc-500">{a.repo_count} repos · {a.github_org}</div>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 text-sm text-zinc-500">
+                    <span className={`inline-block w-2 h-2 rounded-full ${a.status === 'completed' ? 'bg-devin-green' : a.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                    {new Date(a.created_at).toLocaleDateString()}
+                  </div>
+                  <ChevronRight size={16} className="text-zinc-600 flex-shrink-0" />
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -430,7 +524,13 @@ function ResultsView({
               <span className="text-xs sm:text-sm text-zinc-500 truncate block">github.com/{displayResult.github_org} · {displayResult.repos.length} repos</span>
             </div>
             {/* Desktop action buttons */}
-            <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+            <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+              {displayResult.status === 'completed' && (
+                <>
+                  <ShareButton jobId={displayResult.job_id} />
+                  <PDFExportButton result={displayResult} />
+                </>
+              )}
               {displayResult.status === 'completed' && !isDeep && (
                 <DeepResearchButton jobId={displayResult.job_id} onStarted={() => setDeepResearchPolling(true)} />
               )}
@@ -455,6 +555,12 @@ function ResultsView({
           </div>
           {/* Mobile action buttons — stacked below header */}
           <div className="flex sm:hidden items-center gap-2 mt-3 flex-wrap">
+            {displayResult.status === 'completed' && (
+              <>
+                <ShareButton jobId={displayResult.job_id} />
+                <PDFExportButton result={displayResult} />
+              </>
+            )}
             {displayResult.status === 'completed' && !isDeep && (
               <DeepResearchButton jobId={displayResult.job_id} onStarted={() => setDeepResearchPolling(true)} />
             )}
@@ -514,19 +620,38 @@ function ResultsView({
 
 function GenerateDeckButton({ jobId }: { jobId: string }) {
   const [deckState, setDeckState] = useState<'idle' | 'generating' | 'done' | 'error'>('idle')
+  const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const handleGenerate = async () => {
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const audiences = [
+    { key: 'general', label: 'General Deck', desc: 'Balanced for all audiences' },
+    { key: 'cto', label: 'CTO / Executive', desc: 'ROI, cost savings, strategic alignment' },
+    { key: 'engineering_manager', label: 'Engineering Manager', desc: 'Velocity, coverage, team capacity' },
+    { key: 'ic', label: 'Developer / IC', desc: 'DX, tooling, workflow automation' },
+  ]
+
+  const handleGenerate = async (audience: string) => {
+    setShowDropdown(false)
     setDeckState('generating')
     try {
-      const r = await fetch(`${API_URL}/api/generate-deck/${jobId}`)
+      const r = await fetch(`${API_URL}/api/generate-deck/${jobId}?audience=${audience}`)
       if (!r.ok) throw new Error('Deck generation failed')
       const htmlContent = await r.text()
-      // Open in new tab
       const blob = new Blob([htmlContent], { type: 'text/html' })
       const url = URL.createObjectURL(blob)
       window.open(url, '_blank')
       setDeckState('done')
-      // Reset after a few seconds so button can be used again
       setTimeout(() => setDeckState('idle'), 5000)
     } catch {
       setDeckState('error')
@@ -535,29 +660,310 @@ function GenerateDeckButton({ jobId }: { jobId: string }) {
   }
 
   return (
-    <button
-      onClick={handleGenerate}
-      disabled={deckState === 'generating'}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-        deckState === 'generating'
-          ? 'bg-devin-purple/30 text-devin-purple-light cursor-wait'
-          : deckState === 'done'
-          ? 'bg-devin-green/20 text-devin-green border border-devin-green/40'
-          : deckState === 'error'
-          ? 'bg-red-900/30 text-red-400 border border-red-800'
-          : 'bg-gradient-to-r from-devin-purple to-devin-blue hover:from-devin-purple-light hover:to-devin-blue-light text-white shadow-lg shadow-devin-purple/20'
-      }`}
-    >
-      {deckState === 'generating' ? (
-        <><Loader2 size={16} className="animate-spin" /> Generating Deck...</>
-      ) : deckState === 'done' ? (
-        <><Check size={16} /> Deck Opened</>
-      ) : deckState === 'error' ? (
-        <><AlertCircle size={16} /> Failed — Retry</>
-      ) : (
-        <><Presentation size={16} /> Generate Pitch Deck</>
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setShowDropdown(!showDropdown)}
+        disabled={deckState === 'generating'}
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+          deckState === 'generating'
+            ? 'bg-devin-purple/30 text-devin-purple-light cursor-wait'
+            : deckState === 'done'
+            ? 'bg-devin-green/20 text-devin-green border border-devin-green/40'
+            : deckState === 'error'
+            ? 'bg-red-900/30 text-red-400 border border-red-800'
+            : 'bg-gradient-to-r from-devin-purple to-devin-blue hover:from-devin-purple-light hover:to-devin-blue-light text-white shadow-lg shadow-devin-purple/20'
+        }`}
+      >
+        {deckState === 'generating' ? (
+          <><Loader2 size={16} className="animate-spin" /> Generating...</>
+        ) : deckState === 'done' ? (
+          <><Check size={16} /> Deck Opened</>
+        ) : deckState === 'error' ? (
+          <><AlertCircle size={16} /> Failed — Retry</>
+        ) : (
+          <><Presentation size={16} /> Generate Deck <ChevronDown size={14} /></>
+        )}
+      </button>
+      {showDropdown && deckState === 'idle' && (
+        <div className="absolute right-0 top-full mt-2 w-72 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl shadow-black/50 z-50 overflow-hidden">
+          {audiences.map((a) => (
+            <button
+              key={a.key}
+              onClick={() => handleGenerate(a.key)}
+              className="w-full text-left px-4 py-3 hover:bg-zinc-800 transition-colors border-b border-zinc-800 last:border-0"
+            >
+              <div className="text-sm font-medium text-white">{a.label}</div>
+              <div className="text-xs text-zinc-500 mt-0.5">{a.desc}</div>
+            </button>
+          ))}
+        </div>
       )}
+    </div>
+  )
+}
+
+function ShareButton({ jobId }: { jobId: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleShare = () => {
+    const url = `${window.location.origin}${window.location.pathname}#/results/${jobId}`
+    navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <button
+      onClick={handleShare}
+      className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors"
+      title="Copy shareable link"
+    >
+      {copied ? <Check size={14} className="text-devin-green" /> : <Link size={14} />}
+      <span className="hidden sm:inline">{copied ? 'Copied!' : 'Share'}</span>
     </button>
+  )
+}
+
+function PDFExportButton({ result }: { result: AnalysisResult }) {
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = () => {
+    if (!result.business_case) return
+    setExporting(true)
+
+    const bc = result.business_case
+    const cr = result.company_research
+    const roi = bc.roi_estimate as Record<string, unknown>
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Devin Business Case — ${result.company_name}</title>
+<style>
+  @page { margin: 1in; size: A4; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 40px; }
+  h1 { font-size: 28px; border-bottom: 3px solid #3969CA; padding-bottom: 12px; margin-bottom: 8px; }
+  h2 { font-size: 20px; color: #3969CA; margin-top: 32px; border-bottom: 1px solid #e5e5e5; padding-bottom: 8px; }
+  h3 { font-size: 16px; color: #555; margin-top: 20px; }
+  .subtitle { color: #666; font-size: 14px; margin-bottom: 32px; }
+  .brand { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
+  .brand-pill { background: #3969CA; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .metrics { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .metric { background: #f8f9fa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 16px; text-align: center; }
+  .metric-value { font-size: 24px; font-weight: 700; color: #21C19A; }
+  .metric-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+  .section { margin-bottom: 24px; }
+  .tier { border-left: 4px solid #3969CA; padding: 16px; margin: 12px 0; background: #f8f9fa; border-radius: 0 8px 8px 0; }
+  .tier.exec { border-color: #21C19A; }
+  .tier.em { border-color: #3969CA; }
+  .tier.dev { border-color: #0294DE; }
+  .tier h4 { margin: 0 0 8px 0; font-size: 14px; }
+  .tier ul { margin: 0; padding-left: 20px; }
+  .tier li { font-size: 13px; margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e5e5; }
+  th { background: #f8f9fa; font-weight: 600; color: #555; }
+  .footer { margin-top: 48px; padding-top: 16px; border-top: 2px solid #e5e5e5; font-size: 11px; color: #999; text-align: center; }
+  @media print { body { padding: 0; } .no-print { display: none; } }
+</style>
+</head>
+<body>
+<div class="brand">
+  <span class="brand-pill">Devin × ${result.company_name}</span>
+  <span style="color: #999; font-size: 12px;">Business Case Report</span>
+</div>
+<h1>Engineering Efficiency Analysis</h1>
+<p class="subtitle">${result.company_name} (github.com/${result.github_org}) · ${result.repos.length} repositories analyzed · Generated ${new Date().toLocaleDateString()}</p>
+
+<h2>Executive Summary</h2>
+<div class="section">${(bc.executive_summary || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}</div>
+
+<h2>ROI Estimate</h2>
+<div class="metrics">
+  <div class="metric"><div class="metric-value">$${Number(roi.manual_cost || 0).toLocaleString()}</div><div class="metric-label">Manual Cost</div></div>
+  <div class="metric"><div class="metric-value">$${Number(roi.devin_cost || 0).toLocaleString()}</div><div class="metric-label">With Devin</div></div>
+  <div class="metric"><div class="metric-value" style="color: #21C19A;">$${Number(roi.annual_savings || 0).toLocaleString()}</div><div class="metric-label">Annual Savings</div></div>
+  <div class="metric"><div class="metric-value">${Number(roi.hours_recaptured || 0).toLocaleString()}</div><div class="metric-label">Hours Recaptured</div></div>
+</div>
+
+<h2>Three-Tier Impact Analysis</h2>
+${Object.entries(bc.three_tier_impact || {}).map(([key, tier]) => `
+<div class="tier ${key === 'executive' ? 'exec' : key === 'engineering_manager' ? 'em' : 'dev'}">
+  <h4>${(tier as {label: string}).label}</h4>
+  <ul>${((tier as {metrics: string[]}).metrics || []).map(m => `<li>${m}</li>`).join('')}</ul>
+</div>`).join('')}
+
+<h2>Build vs. Buy Comparison</h2>
+<table>
+<thead><tr><th></th>${Object.values(bc.build_vs_buy || {}).map(opt => `<th>${(opt as {label: string}).label}</th>`).join('')}</tr></thead>
+<tbody>${['cost_per_pass', 'ramp_time', 'scaling', 'risk', 'coverage'].map(field =>
+  `<tr><td style="font-weight:600; color:#555;">${field.replace(/_/g, ' ')}</td>${Object.values(bc.build_vs_buy || {}).map(opt => `<td>${(opt as Record<string, string>)[field] || ''}</td>`).join('')}</tr>`
+).join('')}</tbody>
+</table>
+
+${cr ? `<h2>Company Intelligence</h2>
+<p>${cr.summary || ''}</p>
+${cr.key_initiatives?.length ? `<h3>Key Initiatives</h3><ul>${cr.key_initiatives.map(i => `<li>${i}</li>`).join('')}</ul>` : ''}
+${cr.strategic_priorities?.length ? `<h3>Strategic Priorities</h3><ul>${cr.strategic_priorities.map(p => `<li>${p}</li>`).join('')}</ul>` : ''}` : ''}
+
+<div class="footer">
+  Devin × ${result.company_name} · Business Case Report · Confidential · Generated by Devin GTM Engine
+</div>
+<script>window.onload = function() { window.print(); }</script>
+</body>
+</html>`
+
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    setExporting(false)
+  }
+
+  return (
+    <button
+      onClick={handleExport}
+      disabled={exporting || !result.business_case}
+      className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors disabled:opacity-50"
+      title="Export business case as PDF"
+    >
+      {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+      <span className="hidden sm:inline">PDF</span>
+    </button>
+  )
+}
+
+function CompareView({ data, onBack, onViewAnalysis }: {
+  data: Record<string, unknown>
+  onBack: () => void
+  onViewAnalysis: (jobId: string) => void
+}) {
+  const c1 = data.company_1 as { job_id: string; company_name: string; github_org: string; research_depth: string; metrics: Record<string, unknown> }
+  const c2 = data.company_2 as { job_id: string; company_name: string; github_org: string; research_depth: string; metrics: Record<string, unknown> }
+
+  const metricRows = [
+    { key: 'repos', label: 'Repositories', format: (v: unknown) => String(v) },
+    { key: 'issues', label: 'Open Issues', format: (v: unknown) => Number(v).toLocaleString() },
+    { key: 'stars', label: 'Stars', format: (v: unknown) => Number(v).toLocaleString() },
+    { key: 'opportunities', label: 'Devin Opportunities', format: (v: unknown) => String(v) },
+    { key: 'test_coverage_pct', label: 'Test Coverage', format: (v: unknown) => `${v}%` },
+    { key: 'avg_pr_merge_hours', label: 'Avg PR Merge Time', format: (v: unknown) => `${v} hrs` },
+    { key: 'security_findings', label: 'Security Findings', format: (v: unknown) => String(v) },
+    { key: 'annual_savings', label: 'Annual Savings', format: (v: unknown) => `$${Number(v).toLocaleString()}` },
+    { key: 'hours_recaptured', label: 'Hours Recaptured', format: (v: unknown) => Number(v).toLocaleString() },
+  ]
+
+  const getBetter = (key: string, v1: unknown, v2: unknown): 'c1' | 'c2' | 'tie' => {
+    const n1 = Number(v1), n2 = Number(v2)
+    if (n1 === n2) return 'tie'
+    // Higher is better for these
+    if (['repos', 'stars', 'opportunities', 'test_coverage_pct', 'annual_savings', 'hours_recaptured'].includes(key)) {
+      return n1 > n2 ? 'c1' : 'c2'
+    }
+    // Lower is better for these
+    if (['issues', 'avg_pr_merge_hours', 'security_findings'].includes(key)) {
+      return n1 < n2 ? 'c1' : 'c2'
+    }
+    return 'tie'
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white overflow-x-hidden">
+      {/* Header */}
+      <div className="border-b border-zinc-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0">
+              <ArrowLeft size={18} />
+            </button>
+            <div className="w-8 h-8 bg-gradient-to-br from-devin-purple to-devin-blue rounded-lg flex items-center justify-center flex-shrink-0">
+              <GitCompare size={16} className="text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="font-semibold text-base sm:text-lg">Comparison Mode</h1>
+              <span className="text-xs sm:text-sm text-zinc-500">{c1.company_name} vs {c2.company_name}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Comparison Table */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          {/* Header row */}
+          <div className="grid grid-cols-3 border-b border-zinc-800">
+            <div className="p-4 text-sm font-medium text-zinc-500">Metric</div>
+            <div className="p-4 text-center border-l border-zinc-800">
+              <button onClick={() => onViewAnalysis(c1.job_id)} className="hover:text-devin-green transition-colors">
+                <div className="font-semibold text-sm sm:text-base">{c1.company_name}</div>
+                <div className="text-xs text-zinc-500">{c1.github_org} · {c1.research_depth}</div>
+              </button>
+            </div>
+            <div className="p-4 text-center border-l border-zinc-800">
+              <button onClick={() => onViewAnalysis(c2.job_id)} className="hover:text-devin-green transition-colors">
+                <div className="font-semibold text-sm sm:text-base">{c2.company_name}</div>
+                <div className="text-xs text-zinc-500">{c2.github_org} · {c2.research_depth}</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Metric rows */}
+          {metricRows.map(({ key, label, format }) => {
+            const v1 = c1.metrics[key]
+            const v2 = c2.metrics[key]
+            const better = getBetter(key, v1, v2)
+            return (
+              <div key={key} className="grid grid-cols-3 border-b border-zinc-800 last:border-0">
+                <div className="p-4 text-sm text-zinc-400">{label}</div>
+                <div className={`p-4 text-center border-l border-zinc-800 text-sm font-medium ${better === 'c1' ? 'text-devin-green bg-devin-green/5' : 'text-zinc-300'}`}>
+                  {format(v1)}
+                  {better === 'c1' && <span className="ml-1 text-xs text-devin-green">★</span>}
+                </div>
+                <div className={`p-4 text-center border-l border-zinc-800 text-sm font-medium ${better === 'c2' ? 'text-devin-green bg-devin-green/5' : 'text-zinc-300'}`}>
+                  {format(v2)}
+                  {better === 'c2' && <span className="ml-1 text-xs text-devin-green">★</span>}
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Languages row */}
+          <div className="grid grid-cols-3 border-b border-zinc-800">
+            <div className="p-4 text-sm text-zinc-400">Languages</div>
+            <div className="p-4 border-l border-zinc-800">
+              <div className="flex flex-wrap gap-1 justify-center">
+                {(c1.metrics.languages as string[] || []).map(l => (
+                  <span key={l} className="px-2 py-0.5 bg-zinc-800 rounded text-xs text-zinc-400">{l}</span>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 border-l border-zinc-800">
+              <div className="flex flex-wrap gap-1 justify-center">
+                {(c2.metrics.languages as string[] || []).map(l => (
+                  <span key={l} className="px-2 py-0.5 bg-zinc-800 rounded text-xs text-zinc-400">{l}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick actions */}
+        <div className="mt-6 flex flex-wrap gap-3 justify-center">
+          <button
+            onClick={() => onViewAnalysis(c1.job_id)}
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors"
+          >
+            View {c1.company_name} Analysis →
+          </button>
+          <button
+            onClick={() => onViewAnalysis(c2.job_id)}
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors"
+          >
+            View {c2.company_name} Analysis →
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
