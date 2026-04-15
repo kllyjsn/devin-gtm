@@ -240,10 +240,10 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-zinc-950 text-white overflow-x-hidden">
       {/* Header */}
       <div className="border-b border-zinc-800">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           <div className="w-8 h-8 bg-gradient-to-br from-devin-green to-devin-blue rounded-lg flex items-center justify-center">
             <Zap size={16} className="text-white" />
           </div>
@@ -253,19 +253,19 @@ function App() {
       </div>
 
       {/* Hero */}
-      <div className="max-w-5xl mx-auto px-6 pt-24 pb-16">
-        <div className="text-center space-y-6">
-          <h1 className="text-5xl font-bold tracking-tight">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-12 sm:pt-24 pb-10 sm:pb-16">
+        <div className="text-center space-y-4 sm:space-y-6">
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight">
             Turn any company into a
             <span className="bg-gradient-to-r from-devin-green to-devin-blue bg-clip-text text-transparent"> Devin business case</span>
           </h1>
-          <p className="text-zinc-400 text-xl max-w-2xl mx-auto">
+          <p className="text-zinc-400 text-base sm:text-xl max-w-2xl mx-auto">
             Enter a company URL or GitHub org. We'll analyze their repos, research their strategy, and generate a complete sales playbook.
           </p>
 
           {/* Input */}
-          <div className="max-w-2xl mx-auto mt-10">
-            <div className="flex gap-3">
+          <div className="max-w-2xl mx-auto mt-6 sm:mt-10">
+            <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 relative">
                 <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <input
@@ -274,13 +274,13 @@ function App() {
                   onChange={(e) => setInputUrl(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
                   placeholder="stripe.com, github.com/vercel, or just 'shopify'"
-                  className="w-full pl-11 pr-4 py-4 bg-zinc-900 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-devin-green focus:ring-1 focus:ring-devin-green text-lg"
+                  className="w-full pl-11 pr-4 py-3.5 sm:py-4 bg-zinc-900 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-devin-green focus:ring-1 focus:ring-devin-green text-base sm:text-lg"
                 />
               </div>
               <button
                 onClick={handleSubmit}
                 disabled={!inputUrl.trim()}
-                className="px-8 py-4 bg-devin-green hover:bg-devin-green-light disabled:bg-zinc-700 disabled:text-zinc-500 rounded-xl font-semibold text-lg transition-colors text-black"
+                className="px-8 py-3.5 sm:py-4 bg-devin-green hover:bg-devin-green-light disabled:bg-zinc-700 disabled:text-zinc-500 rounded-xl font-semibold text-base sm:text-lg transition-colors text-black"
               >
                 Analyze
               </button>
@@ -291,27 +291,27 @@ function App() {
 
       {/* Past Analyses */}
       {pastAnalyses.length > 0 && (
-        <div className="max-w-5xl mx-auto px-6 pb-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
           <h2 className="text-zinc-400 text-sm font-medium uppercase tracking-wider mb-4">Recent Analyses</h2>
           <div className="grid gap-3">
             {pastAnalyses.map((a) => (
               <button
                 key={a.job_id}
                 onClick={() => loadResult(a.job_id)}
-                className="flex items-center gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-zinc-600 transition-colors text-left w-full"
+                className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-zinc-600 transition-colors text-left w-full"
               >
-                <div className="w-10 h-10 bg-zinc-800 rounded-lg flex items-center justify-center">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-zinc-800 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Building2 size={18} className="text-zinc-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{a.company_name || a.input_url}</div>
-                  <div className="text-sm text-zinc-500">{a.repo_count} repos · {a.github_org}</div>
+                  <div className="font-medium truncate text-sm sm:text-base">{a.company_name || a.input_url}</div>
+                  <div className="text-xs sm:text-sm text-zinc-500">{a.repo_count} repos · {a.github_org}</div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-zinc-500">
+                <div className="hidden sm:flex items-center gap-2 text-sm text-zinc-500">
                   <span className={`inline-block w-2 h-2 rounded-full ${a.status === 'completed' ? 'bg-devin-green' : a.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500'}`} />
                   {new Date(a.created_at).toLocaleDateString()}
                 </div>
-                <ChevronRight size={16} className="text-zinc-600" />
+                <ChevronRight size={16} className="text-zinc-600 flex-shrink-0" />
               </button>
             ))}
           </div>
@@ -414,34 +414,60 @@ function ResultsView({
   const isDeep = displayResult.research_depth === 'deep'
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-zinc-950 text-white overflow-x-hidden">
       {/* Header */}
       <div className="border-b border-zinc-800">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
-            <ArrowLeft size={18} />
-          </button>
-          <div className="w-8 h-8 bg-gradient-to-br from-devin-green to-devin-blue rounded-lg flex items-center justify-center">
-            <Zap size={16} className="text-white" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0">
+              <ArrowLeft size={18} />
+            </button>
+            <div className="w-8 h-8 bg-gradient-to-br from-devin-green to-devin-blue rounded-lg flex items-center justify-center flex-shrink-0">
+              <Zap size={16} className="text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="font-semibold text-base sm:text-lg truncate">{displayResult.company_name}</h1>
+              <span className="text-xs sm:text-sm text-zinc-500 truncate block">github.com/{displayResult.github_org} · {displayResult.repos.length} repos</span>
+            </div>
+            {/* Desktop action buttons */}
+            <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+              {displayResult.status === 'completed' && !isDeep && (
+                <DeepResearchButton jobId={displayResult.job_id} onStarted={() => setDeepResearchPolling(true)} />
+              )}
+              {isDeepResearching && (
+                <span className="flex items-center gap-2 px-3 py-1.5 bg-devin-blue/20 text-devin-blue text-sm rounded-full border border-devin-blue/30">
+                  <Loader2 size={14} className="animate-spin" /> Deep researching...
+                </span>
+              )}
+              {displayResult.status === 'completed' && isDeep && (
+                <GenerateDeckButton jobId={displayResult.job_id} />
+              )}
+              {displayResult.status === 'completed' && (
+                <span className={`px-3 py-1 text-sm rounded-full border ${
+                  isDeep
+                    ? 'bg-devin-purple/20 text-devin-purple-light border-devin-purple/40'
+                    : 'bg-devin-green/15 text-devin-green border-devin-green/30'
+                }`}>
+                  {isDeep ? 'Deep Research' : 'Light Preview'}
+                </span>
+              )}
+            </div>
           </div>
-          <div>
-            <h1 className="font-semibold text-lg">{displayResult.company_name}</h1>
-            <span className="text-sm text-zinc-500">github.com/{displayResult.github_org} · {displayResult.repos.length} repos</span>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
+          {/* Mobile action buttons — stacked below header */}
+          <div className="flex sm:hidden items-center gap-2 mt-3 flex-wrap">
             {displayResult.status === 'completed' && !isDeep && (
               <DeepResearchButton jobId={displayResult.job_id} onStarted={() => setDeepResearchPolling(true)} />
             )}
             {isDeepResearching && (
-              <span className="flex items-center gap-2 px-3 py-1.5 bg-devin-blue/20 text-devin-blue text-sm rounded-full border border-devin-blue/30">
-                <Loader2 size={14} className="animate-spin" /> Deep researching...
+              <span className="flex items-center gap-2 px-3 py-1.5 bg-devin-blue/20 text-devin-blue text-xs rounded-full border border-devin-blue/30">
+                <Loader2 size={14} className="animate-spin" /> Researching...
               </span>
             )}
             {displayResult.status === 'completed' && isDeep && (
               <GenerateDeckButton jobId={displayResult.job_id} />
             )}
             {displayResult.status === 'completed' && (
-              <span className={`px-3 py-1 text-sm rounded-full border ${
+              <span className={`px-2.5 py-1 text-xs rounded-full border ${
                 isDeep
                   ? 'bg-devin-purple/20 text-devin-purple-light border-devin-purple/40'
                   : 'bg-devin-green/15 text-devin-green border-devin-green/30'
@@ -455,26 +481,27 @@ function ResultsView({
 
       {/* Tabs */}
       <div className="border-b border-zinc-800">
-        <div className="max-w-7xl mx-auto px-6 flex gap-1">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex gap-1 overflow-x-auto scrollbar-hide">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id
                   ? 'border-devin-green text-white'
                   : 'border-transparent text-zinc-500 hover:text-zinc-300'
               }`}
             >
-              <tab.icon size={16} />
-              {tab.label}
+              <tab.icon size={14} className="sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.id === 'business_case' ? 'Biz Case' : tab.id === 'intel' ? 'Intel' : tab.id === 'assets' ? 'GTM' : tab.label}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* Tab Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {activeTab === 'overview' && <OverviewTab result={displayResult} />}
         {activeTab === 'repos' && <ReposTab result={displayResult} />}
         {activeTab === 'intel' && <IntelTab result={displayResult} isDeep={isDeep} isDeepResearching={isDeepResearching} onStartDeep={() => setDeepResearchPolling(true)} />}
@@ -606,9 +633,9 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
   const highSeverityFindings = allSecurityFindings.filter(f => f.severity === 'high' || f.severity === 'critical')
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard icon={GitBranch} label="Repos Analyzed" value={result.repo_analyses.length.toString()} />
         <StatCard icon={AlertCircle} label="Open Issues" value={totalIssues.toLocaleString()} />
         <StatCard icon={Zap} label="Devin Opportunities" value={totalOpportunities.toString()} />
@@ -617,7 +644,7 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
 
       {/* Quick Facts + Issue Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
           <h3 className="font-semibold mb-4">GitHub Footprint</h3>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between"><span className="text-zinc-400">Public Repos</span><span>{result.repos.length}</span></div>
@@ -629,7 +656,7 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
 
         {/* Issue Classification Breakdown */}
         {Object.keys(allClassifications).length > 0 ? (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
             <h3 className="font-semibold mb-4 flex items-center gap-2"><Tag size={16} className="text-devin-purple" /> Issue Breakdown</h3>
             <div className="space-y-2">
               {Object.entries(allClassifications).sort((a, b) => b[1] - a[1]).map(([classification, count]) => {
@@ -730,14 +757,14 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
       <TrendOverview analyses={result.repo_analyses} />
 
       {/* Top Opportunities */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
         <h3 className="font-semibold mb-4">Top Devin Opportunities</h3>
         <div className="grid gap-3">
           {result.repo_analyses.flatMap(ra =>
             ra.devin_opportunities.map(opp => ({ ...opp, repo: ra.repo.name, repoUrl: ra.repo.url }))
           ).slice(0, 8).map((opp, i) => (
-            <div key={i} className="flex items-start gap-4 p-4 bg-zinc-800/50 rounded-lg">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+            <div key={i} className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-zinc-800/50 rounded-lg">
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                 opp.impact === 'high' || opp.impact === 'critical' ? 'bg-red-900/30 text-red-400' : 'bg-yellow-900/30 text-yellow-400'
               }`}>
                 {opp.type === 'Bug Fixes' ? <Bug size={18} /> :
@@ -749,8 +776,8 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
                  <Zap size={18} />}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium">{opp.type}</span>
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
+                  <span className="font-medium text-sm sm:text-base">{opp.type}</span>
                   <span className="text-xs text-zinc-500">in {opp.repo}</span>
                   <span className={`px-2 py-0.5 text-xs rounded-full ${
                     opp.impact === 'high' || opp.impact === 'critical' ? 'bg-red-900/30 text-red-400' : opp.impact === 'medium' ? 'bg-yellow-900/30 text-yellow-400' : 'bg-blue-900/30 text-blue-400'
@@ -873,12 +900,12 @@ function TrendOverview({ analyses }: { analyses: RepoAnalysis[] }) {
 
 function StatCard({ icon: Icon, label, value }: { icon: typeof GitBranch; label: string; value: string }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <Icon size={18} className="text-zinc-500" />
-        <span className="text-sm text-zinc-400">{label}</span>
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-5">
+      <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+        <Icon size={16} className="text-zinc-500 sm:w-[18px] sm:h-[18px]" />
+        <span className="text-xs sm:text-sm text-zinc-400">{label}</span>
       </div>
-      <div className="text-2xl font-bold">{value}</div>
+      <div className="text-xl sm:text-2xl font-bold truncate">{value}</div>
     </div>
   )
 }
@@ -887,20 +914,14 @@ function ReposTab({ result }: { result: AnalysisResult }) {
   return (
     <div className="space-y-4">
       {result.repo_analyses.map((ra) => (
-        <div key={ra.repo.full_name} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <a href={ra.repo.url} target="_blank" rel="noopener noreferrer" className="text-lg font-semibold hover:text-devin-green flex items-center gap-2">
-                {ra.repo.name} <ExternalLink size={14} />
+        <div key={ra.repo.full_name} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
+          <div className="mb-4">
+            <div className="flex items-start justify-between gap-2">
+              <a href={ra.repo.url} target="_blank" rel="noopener noreferrer" className="text-base sm:text-lg font-semibold hover:text-devin-green flex items-center gap-2 min-w-0">
+                <span className="truncate">{ra.repo.name}</span> <ExternalLink size={14} className="flex-shrink-0" />
               </a>
-              <p className="text-sm text-zinc-400 mt-1">{ra.repo.description}</p>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-zinc-400">
-              <span>&#9733; {ra.repo.stars.toLocaleString()}</span>
-              <span>{ra.repo.open_issues} issues</span>
-              <span>{ra.repo.language}</span>
               {ra.trend_data?.backlog_trend && ra.trend_data.backlog_trend !== 'unknown' && (
-                <span className={`px-2 py-0.5 text-xs rounded-full border ${
+                <span className={`px-2 py-0.5 text-xs rounded-full border flex-shrink-0 ${
                   ra.trend_data.backlog_trend === 'growing' ? 'bg-red-900/20 text-red-400 border-red-800' :
                   ra.trend_data.backlog_trend === 'shrinking' ? 'bg-green-900/20 text-green-400 border-green-800' :
                   'bg-zinc-800 text-zinc-400 border-zinc-700'
@@ -908,6 +929,12 @@ function ReposTab({ result }: { result: AnalysisResult }) {
                   {ra.trend_data.backlog_trend === 'growing' ? '↑ Growing' : ra.trend_data.backlog_trend === 'shrinking' ? '↓ Shrinking' : '→ Stable'}
                 </span>
               )}
+            </div>
+            <p className="text-sm text-zinc-400 mt-1 line-clamp-2">{ra.repo.description}</p>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 text-xs sm:text-sm text-zinc-400">
+              <span>&#9733; {ra.repo.stars.toLocaleString()}</span>
+              <span>{ra.repo.open_issues} issues</span>
+              {ra.repo.language && <span>{ra.repo.language}</span>}
             </div>
           </div>
 
@@ -1064,7 +1091,7 @@ function IntelTab({ result, isDeep, isDeepResearching, onStartDeep }: { result: 
     <div className="space-y-6">
       {/* Deep Research CTA — show when light mode */}
       {!isDeep && !isDeepResearching && result.status === 'completed' && (
-        <div className="bg-gradient-to-r from-devin-blue/10 to-devin-purple/10 border border-devin-blue/30 rounded-xl p-6 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-devin-blue/10 to-devin-purple/10 border border-devin-blue/30 rounded-xl p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h3 className="font-semibold flex items-center gap-2 mb-1"><Microscope size={16} className="text-devin-blue" /> Light Preview</h3>
             <p className="text-sm text-zinc-400">
@@ -1385,16 +1412,16 @@ function BusinessCaseTab({ result }: { result: AnalysisResult }) {
   return (
     <div className="space-y-6">
       {/* Executive Summary */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
         <h3 className="font-semibold mb-3">Executive Summary</h3>
         <div className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line"
           dangerouslySetInnerHTML={{ __html: bc.executive_summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
       </div>
 
       {/* ROI */}
-      <div className="bg-gradient-to-br from-devin-green/10 to-devin-blue/10 border border-devin-green/30 rounded-xl p-6">
+      <div className="bg-gradient-to-br from-devin-green/10 to-devin-blue/10 border border-devin-green/30 rounded-xl p-4 sm:p-6">
         <h3 className="font-semibold mb-4 flex items-center gap-2"><TrendingUp size={16} className="text-devin-green" /> ROI Estimate</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div>
             <div className="text-xs text-zinc-400 mb-1">Manual Cost</div>
             <div className="text-xl font-bold">${(bc.roi_estimate.manual_cost as number)?.toLocaleString()}</div>
@@ -1415,7 +1442,7 @@ function BusinessCaseTab({ result }: { result: AnalysisResult }) {
       </div>
 
       {/* Build vs Buy */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
         <h3 className="font-semibold mb-4">Build vs. Buy Comparison</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1444,7 +1471,7 @@ function BusinessCaseTab({ result }: { result: AnalysisResult }) {
       </div>
 
       {/* Three-Tier Impact */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
         <h3 className="font-semibold mb-4">Three-Tier Impact Analysis</h3>
         <div className="grid gap-4">
           {Object.entries(bc.three_tier_impact).map(([key, tier]) => {
@@ -1482,9 +1509,9 @@ function AssetsTab({ result, copiedField, copyToClipboard }: { result: AnalysisR
   return (
     <div className="space-y-6">
       {/* Pre-meeting Email */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold flex items-center gap-2"><FileText size={16} /> Pre-Meeting Email</h3>
+          <h3 className="font-semibold flex items-center gap-2 text-sm sm:text-base"><FileText size={16} /> Pre-Meeting Email</h3>
           <button
             onClick={() => copyToClipboard(assets.pre_meeting_email, 'email')}
             className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors"
@@ -1497,7 +1524,7 @@ function AssetsTab({ result, copiedField, copyToClipboard }: { result: AnalysisR
       </div>
 
       {/* Discovery Questions */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
         <h3 className="font-semibold mb-4">Discovery Questions</h3>
         <div className="space-y-3">
           {assets.discovery_questions.map((q, i) => (
@@ -1510,9 +1537,9 @@ function AssetsTab({ result, copiedField, copyToClipboard }: { result: AnalysisR
       </div>
 
       {/* Executive Summary Doc */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold flex items-center gap-2"><FileText size={16} /> Executive Summary Document</h3>
+          <h3 className="font-semibold flex items-center gap-2 text-sm sm:text-base"><FileText size={16} /> Executive Summary Document</h3>
           <button
             onClick={() => copyToClipboard(assets.executive_summary_doc, 'exec')}
             className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors"
@@ -1525,7 +1552,7 @@ function AssetsTab({ result, copiedField, copyToClipboard }: { result: AnalysisR
       </div>
 
       {/* Pitch Outline */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-6">
         <h3 className="font-semibold mb-4">Pitch Deck Outline</h3>
         <div className="space-y-2">
           {assets.pitch_outline.map((slide) => (

@@ -41,3 +41,26 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Prevent horizontal scroll/swipe on mobile */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Hide scrollbar on tab bar while keeping it scrollable */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile touch improvements */
+@media (max-width: 640px) {
+  /* Prevent text selection during swipe */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+}
