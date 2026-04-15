@@ -4,7 +4,9 @@ import {
   Search, Loader2, Building2, GitBranch, BarChart3, FileText,
   ChevronRight, ExternalLink, AlertCircle, Bug, TestTube,
   BookOpen, Zap, Shield, Users, Clock, DollarSign, TrendingUp,
-  Copy, Check, ArrowLeft, Presentation, Microscope
+  Copy, Check, ArrowLeft, Presentation, Microscope, ShieldAlert,
+  Activity, Target, Briefcase, MessageSquare, Megaphone,
+  AlertTriangle, Info, Tag
 } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -40,6 +42,20 @@ interface RepoAnalysis {
   test_file_ratio: number
   contributor_count: number
   devin_opportunities: Array<{type: string; count: number; impact: string; description: string; devin_advantage: string}>
+  // Enhancement 1: Issue classification
+  issue_classifications: Record<string, number>
+  issue_deep_examples: Array<{number: number; title: string; body_snippet: string; classification: string; severity: string; comments: number; url: string; labels: string[]}>
+  // Enhancement 2: Historical trends
+  trend_data: {
+    issues_opened_by_month: Array<{month: string; count: number}>
+    issues_closed_by_month: Array<{month: string; count: number}>
+    pr_merge_times: Array<{number: number; hours_to_merge: number; month: string}>
+    avg_pr_merge_hours: number
+    backlog_trend: string
+  }
+  // Enhancement 3: Security
+  security_findings: Array<{type: string; severity: string; detail: string; files?: string[]}>
+  dependency_health: {total_deps: number; outdated: number; has_lockfile: boolean}
 }
 
 interface CompanyResearch {
@@ -62,6 +78,18 @@ interface CompanyResearch {
   engineering_blog_insights: string[]
   open_source_strategy: string
   funding_stage: string
+  // Enhancement 4: Multi-source research
+  job_postings_insights: string[]
+  hackernews_sentiment: string
+  conference_talks: string[]
+  // Enhancement 5: Competitor analysis
+  market_segment: string
+  competitors: Array<{name: string; ai_adoption: string; relevance: string}>
+  competitor_ai_adoption_summary: string
+  // Enhancement 6: Firmographic enrichment
+  estimated_headcount: string
+  estimated_engineering_pct: string
+  estimated_revenue_range: string
 }
 
 interface BusinessCase {
@@ -551,6 +579,32 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
   const totalOpportunities = result.repo_analyses.reduce((s, ra) => s + ra.devin_opportunities.length, 0)
   const savings = result.business_case?.roi_estimate?.annual_savings as number | undefined
 
+  // Aggregate enhancement data
+  const allClassifications: Record<string, number> = {}
+  const allSecurityFindings: Array<{type: string; severity: string; detail: string; repo: string}> = []
+  const growingBacklogs: string[] = []
+
+  result.repo_analyses.forEach(ra => {
+    // Issue classifications
+    if (ra.issue_classifications) {
+      Object.entries(ra.issue_classifications).forEach(([k, v]) => {
+        allClassifications[k] = (allClassifications[k] || 0) + v
+      })
+    }
+    // Security findings
+    if (ra.security_findings) {
+      ra.security_findings.forEach(f => {
+        allSecurityFindings.push({ ...f, repo: ra.repo.name })
+      })
+    }
+    // Backlog trends
+    if (ra.trend_data?.backlog_trend === 'growing') {
+      growingBacklogs.push(ra.repo.name)
+    }
+  })
+
+  const highSeverityFindings = allSecurityFindings.filter(f => f.severity === 'high' || f.severity === 'critical')
+
   return (
     <div className="space-y-8">
       {/* Summary Cards */}
@@ -561,7 +615,7 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
         <StatCard icon={DollarSign} label="Est. Annual Savings" value={savings ? `$${savings.toLocaleString()}` : 'N/A'} />
       </div>
 
-      {/* Quick Facts */}
+      {/* Quick Facts + Issue Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <h3 className="font-semibold mb-4">GitHub Footprint</h3>
@@ -573,7 +627,32 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
           </div>
         </div>
 
-        {result.company_research && (
+        {/* Issue Classification Breakdown */}
+        {Object.keys(allClassifications).length > 0 ? (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <h3 className="font-semibold mb-4 flex items-center gap-2"><Tag size={16} className="text-devin-purple" /> Issue Breakdown</h3>
+            <div className="space-y-2">
+              {Object.entries(allClassifications).sort((a, b) => b[1] - a[1]).map(([classification, count]) => {
+                const total = Object.values(allClassifications).reduce((s, v) => s + v, 0)
+                const pct = total > 0 ? (count / total) * 100 : 0
+                const colorMap: Record<string, string> = {
+                  bug: 'bg-red-500', security: 'bg-orange-500', performance: 'bg-yellow-500',
+                  tech_debt: 'bg-purple-500', feature_request: 'bg-blue-500',
+                  documentation: 'bg-cyan-500', other: 'bg-zinc-500',
+                }
+                return (
+                  <div key={classification} className="flex items-center gap-3">
+                    <span className="text-xs text-zinc-400 w-28 capitalize">{classification.replace(/_/g, ' ')}</span>
+                    <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${colorMap[classification] || 'bg-zinc-500'}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs text-zinc-400 w-10 text-right">{count}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : result.company_research ? (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <h3 className="font-semibold mb-4">Company Snapshot</h3>
             <p className="text-sm text-zinc-300 leading-relaxed">{result.company_research.summary || 'No summary available'}</p>
@@ -588,8 +667,67 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
               </div>
             )}
           </div>
-        )}
+        ) : null}
       </div>
+
+      {/* Security Overview + Backlog Health */}
+      {(allSecurityFindings.length > 0 || growingBacklogs.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Security Overview */}
+          {allSecurityFindings.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <h3 className="font-semibold mb-4 flex items-center gap-2"><ShieldAlert size={16} className="text-orange-400" /> Security Overview</h3>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-red-400">{highSeverityFindings.length}</div>
+                  <div className="text-xs text-zinc-500">High/Critical</div>
+                </div>
+                <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-yellow-400">{allSecurityFindings.filter(f => f.severity === 'medium').length}</div>
+                  <div className="text-xs text-zinc-500">Medium</div>
+                </div>
+                <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-blue-400">{allSecurityFindings.filter(f => f.severity === 'low' || f.severity === 'info').length}</div>
+                  <div className="text-xs text-zinc-500">Low/Info</div>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {allSecurityFindings.filter(f => f.severity !== 'info').slice(0, 6).map((f, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm">
+                    <SeverityBadge severity={f.severity} />
+                    <span className="text-zinc-300 flex-1">{f.detail}</span>
+                    <span className="text-xs text-zinc-600">{f.repo}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Backlog Health */}
+          {growingBacklogs.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <h3 className="font-semibold mb-4 flex items-center gap-2"><Activity size={16} className="text-amber-400" /> Backlog Health</h3>
+              <div className="bg-amber-900/20 border border-amber-800/40 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertTriangle size={14} className="text-amber-400" />
+                  <span className="text-sm font-medium text-amber-300">{growingBacklogs.length} repos with growing backlogs</span>
+                </div>
+                <p className="text-xs text-zinc-400">More issues opened than closed in the last 3 months</p>
+              </div>
+              <div className="space-y-2">
+                {growingBacklogs.map((repo, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-zinc-300">
+                    <span className="text-amber-400">•</span> {repo}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Historical Trends — Mini Chart */}
+      <TrendOverview analyses={result.repo_analyses} />
 
       {/* Top Opportunities */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
@@ -600,11 +738,14 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
           ).slice(0, 8).map((opp, i) => (
             <div key={i} className="flex items-start gap-4 p-4 bg-zinc-800/50 rounded-lg">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                opp.impact === 'high' ? 'bg-red-900/30 text-red-400' : 'bg-yellow-900/30 text-yellow-400'
+                opp.impact === 'high' || opp.impact === 'critical' ? 'bg-red-900/30 text-red-400' : 'bg-yellow-900/30 text-yellow-400'
               }`}>
                 {opp.type === 'Bug Fixes' ? <Bug size={18} /> :
                  opp.type === 'Test Coverage' ? <TestTube size={18} /> :
                  opp.type === 'Documentation' ? <BookOpen size={18} /> :
+                 opp.type === 'Security Fixes' ? <ShieldAlert size={18} /> :
+                 opp.type === 'Tech Debt' ? <Activity size={18} /> :
+                 opp.type === 'Growing Backlog' ? <TrendingUp size={18} /> :
                  <Zap size={18} />}
               </div>
               <div className="flex-1 min-w-0">
@@ -612,13 +753,118 @@ function OverviewTab({ result }: { result: AnalysisResult }) {
                   <span className="font-medium">{opp.type}</span>
                   <span className="text-xs text-zinc-500">in {opp.repo}</span>
                   <span className={`px-2 py-0.5 text-xs rounded-full ${
-                    opp.impact === 'high' ? 'bg-red-900/30 text-red-400' : 'bg-yellow-900/30 text-yellow-400'
+                    opp.impact === 'high' || opp.impact === 'critical' ? 'bg-red-900/30 text-red-400' : opp.impact === 'medium' ? 'bg-yellow-900/30 text-yellow-400' : 'bg-blue-900/30 text-blue-400'
                   }`}>{opp.impact}</span>
                 </div>
                 <p className="text-sm text-zinc-400">{opp.description}</p>
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SeverityBadge({ severity }: { severity: string }) {
+  const config: Record<string, { bg: string; text: string; icon: typeof AlertCircle }> = {
+    critical: { bg: 'bg-red-900/40', text: 'text-red-400', icon: AlertCircle },
+    high: { bg: 'bg-red-900/30', text: 'text-red-400', icon: AlertTriangle },
+    medium: { bg: 'bg-yellow-900/30', text: 'text-yellow-400', icon: AlertTriangle },
+    low: { bg: 'bg-blue-900/30', text: 'text-blue-400', icon: Info },
+    info: { bg: 'bg-zinc-800', text: 'text-zinc-400', icon: Info },
+  }
+  const c = config[severity] || config.info
+  const Icon = c.icon
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${c.bg} ${c.text}`}>
+      <Icon size={10} /> {severity}
+    </span>
+  )
+}
+
+function TrendOverview({ analyses }: { analyses: RepoAnalysis[] }) {
+  // Aggregate monthly data across all repos
+  const monthlyOpened: Record<string, number> = {}
+  const monthlyClosed: Record<string, number> = {}
+
+  analyses.forEach(ra => {
+    if (!ra.trend_data) return
+    ra.trend_data.issues_opened_by_month?.forEach(d => {
+      monthlyOpened[d.month] = (monthlyOpened[d.month] || 0) + d.count
+    })
+    ra.trend_data.issues_closed_by_month?.forEach(d => {
+      monthlyClosed[d.month] = (monthlyClosed[d.month] || 0) + d.count
+    })
+  })
+
+  const months = Array.from(new Set([...Object.keys(monthlyOpened), ...Object.keys(monthlyClosed)])).sort()
+  if (months.length < 2) return null
+
+  // Calculate avg PR merge time
+  const allMergeTimes = analyses.flatMap(ra => ra.trend_data?.pr_merge_times || [])
+  const avgMergeHours = allMergeTimes.length > 0
+    ? Math.round(allMergeTimes.reduce((s, p) => s + p.hours_to_merge, 0) / allMergeTimes.length)
+    : 0
+
+  // Build SVG chart data
+  const maxVal = Math.max(...months.map(m => Math.max(monthlyOpened[m] || 0, monthlyClosed[m] || 0)), 1)
+  const chartW = 600
+  const chartH = 120
+  const padding = 30
+
+  const openedPoints = months.map((m, i) => {
+    const x = padding + (i / (months.length - 1)) * (chartW - padding * 2)
+    const y = chartH - padding - ((monthlyOpened[m] || 0) / maxVal) * (chartH - padding * 2)
+    return `${x},${y}`
+  }).join(' ')
+
+  const closedPoints = months.map((m, i) => {
+    const x = padding + (i / (months.length - 1)) * (chartW - padding * 2)
+    const y = chartH - padding - ((monthlyClosed[m] || 0) / maxVal) * (chartH - padding * 2)
+    return `${x},${y}`
+  }).join(' ')
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <h3 className="font-semibold mb-4 flex items-center gap-2"><Activity size={16} className="text-devin-blue" /> Issue Velocity Trends</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full h-32">
+            {/* Grid lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map(pct => {
+              const y = chartH - padding - pct * (chartH - padding * 2)
+              return <line key={pct} x1={padding} y1={y} x2={chartW - padding} y2={y} stroke="#27272a" strokeWidth="1" />
+            })}
+            {/* Opened line */}
+            <polyline fill="none" stroke="#f97316" strokeWidth="2" points={openedPoints} />
+            {/* Closed line */}
+            <polyline fill="none" stroke="#21C19A" strokeWidth="2" points={closedPoints} />
+            {/* Month labels */}
+            {months.filter((_, i) => i % Math.max(1, Math.floor(months.length / 6)) === 0 || i === months.length - 1).map((m, i) => {
+              const idx = months.indexOf(m)
+              const x = padding + (idx / (months.length - 1)) * (chartW - padding * 2)
+              return <text key={i} x={x} y={chartH - 5} textAnchor="middle" fill="#71717a" fontSize="10">{m.slice(5)}</text>
+            })}
+          </svg>
+          <div className="flex items-center gap-4 mt-2 text-xs text-zinc-500">
+            <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-orange-500 inline-block rounded" /> Opened</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-devin-green inline-block rounded" /> Closed</span>
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div className="bg-zinc-800/50 rounded-lg p-4">
+            <div className="text-xs text-zinc-400 mb-1">Avg PR Merge Time</div>
+            <div className="text-xl font-bold">{avgMergeHours > 0 ? `${avgMergeHours}h` : 'N/A'}</div>
+          </div>
+          <div className="bg-zinc-800/50 rounded-lg p-4">
+            <div className="text-xs text-zinc-400 mb-1">Months Tracked</div>
+            <div className="text-xl font-bold">{months.length}</div>
+          </div>
+          <div className="bg-zinc-800/50 rounded-lg p-4">
+            <div className="text-xs text-zinc-400 mb-1">Total PRs Analyzed</div>
+            <div className="text-xl font-bold">{allMergeTimes.length}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -649,10 +895,19 @@ function ReposTab({ result }: { result: AnalysisResult }) {
               </a>
               <p className="text-sm text-zinc-400 mt-1">{ra.repo.description}</p>
             </div>
-            <div className="flex gap-4 text-sm text-zinc-400">
+            <div className="flex items-center gap-3 text-sm text-zinc-400">
               <span>&#9733; {ra.repo.stars.toLocaleString()}</span>
               <span>{ra.repo.open_issues} issues</span>
               <span>{ra.repo.language}</span>
+              {ra.trend_data?.backlog_trend && ra.trend_data.backlog_trend !== 'unknown' && (
+                <span className={`px-2 py-0.5 text-xs rounded-full border ${
+                  ra.trend_data.backlog_trend === 'growing' ? 'bg-red-900/20 text-red-400 border-red-800' :
+                  ra.trend_data.backlog_trend === 'shrinking' ? 'bg-green-900/20 text-green-400 border-green-800' :
+                  'bg-zinc-800 text-zinc-400 border-zinc-700'
+                }`}>
+                  {ra.trend_data.backlog_trend === 'growing' ? '↑ Growing' : ra.trend_data.backlog_trend === 'shrinking' ? '↓ Shrinking' : '→ Stable'}
+                </span>
+              )}
             </div>
           </div>
 
@@ -676,24 +931,100 @@ function ReposTab({ result }: { result: AnalysisResult }) {
             </div>
           )}
 
-          {/* Opportunities */}
-          {ra.devin_opportunities.length > 0 && (
-            <div>
-              <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Devin Opportunities</div>
-              <div className="flex flex-wrap gap-2">
-                {ra.devin_opportunities.map((opp, i) => (
-                  <span key={i} className={`px-3 py-1.5 text-sm rounded-lg border ${
-                    opp.impact === 'high' ? 'bg-red-900/20 text-red-300 border-red-800' : 'bg-yellow-900/20 text-yellow-300 border-yellow-800'
-                  }`}>
-                    {opp.type} ({opp.count})
-                  </span>
+          {/* Issue Classification + Opportunities row */}
+          <div className="flex flex-wrap gap-4 mb-4">
+            {/* Issue Classifications */}
+            {ra.issue_classifications && Object.keys(ra.issue_classifications).length > 0 && (
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Issue Types</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(ra.issue_classifications).sort((a, b) => b[1] - a[1]).map(([cls, count]) => {
+                    const colorMap: Record<string, string> = {
+                      bug: 'bg-red-900/30 text-red-300 border-red-800',
+                      security: 'bg-orange-900/30 text-orange-300 border-orange-800',
+                      performance: 'bg-yellow-900/30 text-yellow-300 border-yellow-800',
+                      tech_debt: 'bg-purple-900/30 text-purple-300 border-purple-800',
+                      feature_request: 'bg-blue-900/30 text-blue-300 border-blue-800',
+                      documentation: 'bg-cyan-900/30 text-cyan-300 border-cyan-800',
+                      other: 'bg-zinc-800 text-zinc-400 border-zinc-700',
+                    }
+                    return (
+                      <span key={cls} className={`px-2 py-1 text-xs rounded-md border ${colorMap[cls] || colorMap.other}`}>
+                        {cls.replace(/_/g, ' ')} ({count})
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Opportunities */}
+            {ra.devin_opportunities.length > 0 && (
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Devin Opportunities</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {ra.devin_opportunities.map((opp, i) => (
+                    <span key={i} className={`px-2 py-1 text-xs rounded-md border ${
+                      opp.impact === 'high' || opp.impact === 'critical' ? 'bg-red-900/20 text-red-300 border-red-800' : 'bg-yellow-900/20 text-yellow-300 border-yellow-800'
+                    }`}>
+                      {opp.type} ({opp.count})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Security Findings */}
+          {ra.security_findings && ra.security_findings.length > 0 && (
+            <div className="mb-4">
+              <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                <ShieldAlert size={12} /> Security Findings
+              </div>
+              <div className="space-y-1.5">
+                {ra.security_findings.filter(f => f.severity !== 'info').slice(0, 4).map((f, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm">
+                    <SeverityBadge severity={f.severity} />
+                    <span className="text-zinc-400">{f.detail}</span>
+                  </div>
+                ))}
+                {ra.security_findings.filter(f => f.severity === 'info').length > 0 && (
+                  <div className="text-xs text-zinc-600 mt-1">
+                    + {ra.security_findings.filter(f => f.severity === 'info').length} informational findings
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Deep Issue Examples */}
+          {ra.issue_deep_examples && ra.issue_deep_examples.length > 0 && (
+            <div className="mt-4">
+              <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Top Issues (Classified)</div>
+              <div className="space-y-1">
+                {ra.issue_deep_examples.slice(0, 5).map((issue) => (
+                  <a key={issue.number} href={issue.url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-zinc-300 hover:text-devin-green py-1">
+                    <span className="text-zinc-600">#{issue.number}</span>
+                    <span className="truncate flex-1">{issue.title}</span>
+                    <span className={`px-1.5 py-0.5 text-xs rounded border ${
+                      issue.classification === 'bug' ? 'bg-red-900/20 text-red-400 border-red-800' :
+                      issue.classification === 'security' ? 'bg-orange-900/20 text-orange-400 border-orange-800' :
+                      'bg-zinc-800 text-zinc-500 border-zinc-700'
+                    }`}>{issue.classification.replace(/_/g, ' ')}</span>
+                    {issue.severity && (
+                      <span className={`px-1.5 py-0.5 text-xs rounded ${
+                        issue.severity === 'high' ? 'bg-red-900/20 text-red-400' : 'bg-zinc-800 text-zinc-500'
+                      }`}>{issue.severity}</span>
+                    )}
+                  </a>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Top Issues */}
-          {ra.top_issues.length > 0 && (
+          {/* Fallback: Top Issues (original) if no deep examples */}
+          {(!ra.issue_deep_examples || ra.issue_deep_examples.length === 0) && ra.top_issues.length > 0 && (
             <div className="mt-4">
               <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Recent Issues</div>
               <div className="space-y-1">
@@ -840,6 +1171,118 @@ function IntelTab({ result, isDeep, isDeepResearching, onStartDeep }: { result: 
             )}
           </div>
         )
+      )}
+
+      {/* Firmographic Enrichment — shown for all companies after deep research */}
+      {isDeep && (research.estimated_headcount || research.estimated_engineering_pct || research.estimated_revenue_range) && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <h3 className="font-semibold mb-4 flex items-center gap-2"><Briefcase size={16} className="text-devin-purple" /> Firmographics</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {research.estimated_headcount && (
+              <div className="bg-zinc-800/50 rounded-lg p-4">
+                <div className="text-xs text-zinc-400 mb-1">Total Headcount</div>
+                <div className="text-lg font-bold text-devin-purple-light">{research.estimated_headcount}</div>
+              </div>
+            )}
+            {research.estimated_engineering_pct && (
+              <div className="bg-zinc-800/50 rounded-lg p-4">
+                <div className="text-xs text-zinc-400 mb-1">Engineering %</div>
+                <div className="text-lg font-bold text-devin-blue">{research.estimated_engineering_pct}</div>
+              </div>
+            )}
+            {research.estimated_revenue_range && (
+              <div className="bg-zinc-800/50 rounded-lg p-4">
+                <div className="text-xs text-zinc-400 mb-1">Est. Revenue</div>
+                <div className="text-lg font-bold text-devin-green">{research.estimated_revenue_range}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Competitor Analysis */}
+      {isDeep && research.competitors && research.competitors.length > 0 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <h3 className="font-semibold mb-2 flex items-center gap-2"><Target size={16} className="text-red-400" /> Competitive Landscape</h3>
+          {research.market_segment && (
+            <div className="mb-4">
+              <span className="px-3 py-1 bg-zinc-800 text-zinc-300 text-sm rounded-full">{research.market_segment}</span>
+            </div>
+          )}
+          <div className="grid gap-3 mb-4">
+            {research.competitors.map((comp, i) => (
+              <div key={i} className="bg-zinc-800/50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium">{comp.name}</span>
+                  {comp.ai_adoption && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-devin-purple/20 text-devin-purple-light border border-devin-purple/30">
+                      {comp.ai_adoption.length > 50 ? comp.ai_adoption.slice(0, 50) + '...' : comp.ai_adoption}
+                    </span>
+                  )}
+                </div>
+                {comp.relevance && <p className="text-sm text-zinc-400">{comp.relevance}</p>}
+              </div>
+            ))}
+          </div>
+          {research.competitor_ai_adoption_summary && (
+            <div className="bg-devin-purple/10 border border-devin-purple/20 rounded-lg p-4">
+              <div className="text-xs text-zinc-400 uppercase tracking-wider mb-2">AI Adoption Summary</div>
+              <p className="text-sm text-zinc-300 leading-relaxed">{research.competitor_ai_adoption_summary}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Multi-Source Research */}
+      {isDeep && (research.job_postings_insights?.length > 0 || research.hackernews_sentiment || research.conference_talks?.length > 0) && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <h3 className="font-semibold mb-4 flex items-center gap-2"><Megaphone size={16} className="text-amber-400" /> Multi-Source Intelligence</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Job Postings */}
+            {research.job_postings_insights && research.job_postings_insights.length > 0 && (
+              <div>
+                <div className="text-xs text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-1">
+                  <Briefcase size={12} /> Job Posting Signals
+                </div>
+                <ul className="space-y-2">
+                  {research.job_postings_insights.map((insight, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-zinc-300">
+                      <span className="text-amber-400 mt-0.5">•</span>
+                      {insight}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* HackerNews Sentiment */}
+            {research.hackernews_sentiment && (
+              <div>
+                <div className="text-xs text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-1">
+                  <MessageSquare size={12} /> HackerNews Sentiment
+                </div>
+                <p className="text-sm text-zinc-300 leading-relaxed">{research.hackernews_sentiment}</p>
+              </div>
+            )}
+
+            {/* Conference Talks */}
+            {research.conference_talks && research.conference_talks.length > 0 && (
+              <div>
+                <div className="text-xs text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-1">
+                  <Presentation size={12} /> Conference & Blog Activity
+                </div>
+                <ul className="space-y-2">
+                  {research.conference_talks.map((talk, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-zinc-300">
+                      <span className="text-cyan-400 mt-0.5">•</span>
+                      {talk}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
